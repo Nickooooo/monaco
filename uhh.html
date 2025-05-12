@@ -20,13 +20,16 @@
       display: flex; flex-direction: column; gap: 12px;
       box-shadow: 2px 0 5px rgba(0, 0, 0, 0.3);
     }
-    #sidebar a {
+    #sidebar a, .icon-btn {
       color: #e0e0e0; text-decoration: none;
       background: #2b2b3c; padding: 10px;
       border-radius: 6px; text-align: center;
       transition: background 0.2s ease;
+      display: flex; justify-content: center; align-items: center;
     }
-    #sidebar a:hover { background: #3b3b4c; }
+    #sidebar a:hover, .icon-btn:hover {
+      background: #3b3b4c;
+    }
     #credits {
       margin-top: auto; text-align: center; font-size: 12px; color: #aaa;
       padding-top: 10px; border-top: 1px solid #333;
@@ -75,6 +78,13 @@
       cursor: pointer; font-weight: bold;
     }
     button:hover { background: #3b3b4c; }
+    #settings {
+      margin-top: 10px;
+      background: #2b2b3c; color: white;
+      padding: 10px; border-radius: 6px;
+      display: flex; justify-content: center; align-items: center;
+    }
+    #settings i { font-size: 18px; }
     #iframeContainer {
       position: absolute;
       top: 0;
@@ -89,29 +99,51 @@
       height: 100%;
       border: none;
     }
-    #issueCount {
-      background-color: #FF5555;
-      color: white;
-      padding: 5px 10px;
-      border-radius: 6px;
-      margin-left: 10px;
-      font-weight: bold;
+    #settings-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .slider-label {
+      color: #ccc;
+      font-size: 14px;
+    }
+    .slider {
+      width: 200px;
     }
   </style>
 </head>
 <body>
   <div id="sidebar">
-    <a href="#">Home</a>
-    <a href="#" onclick="openScriptBlox()">ScriptHub</a>
-    <a href="https://discord.gg/AQ6YFUWyCt" target="_blank">Discord</a>
-    <a href="https://www.youtube.com/@SkyFallRBX" target="_blank">YouTube</a>
-    <a href="https://skyfall.cfd" target="_blank">Website</a>
+    <a href="#" class="icon-btn"><i class="fas fa-home"></i></a>
+    <div class="icon-btn" onclick="openScriptBlox()">
+      <i class="fab fa-scribd"></i>
+    </div>
+    <a href="https://discord.gg/AQ6YFUWyCt" target="_blank" class="icon-btn">
+      <i class="fab fa-discord"></i>
+    </a>
+    <a href="https://www.youtube.com/@SkyFallRBX" target="_blank" class="icon-btn">
+      <i class="fab fa-youtube"></i>
+    </a>
+    <a href="https://skyfall.cfd" target="_blank" class="icon-btn">
+      <i class="fas fa-globe"></i>
+    </a>
+    <div id="settings" class="icon-btn" onclick="toggleSettings()">
+      <i class="fas fa-cogs"></i>
+    </div>
     <div id="credits">
       <div>Credits</div>
       <div class="name">タじモメッし</div>
       <div class="name">sargaborso | †</div>
     </div>
   </div>
+
   <div id="main">
     <div id="tabs">
       <div class="tab active" data-id="tab1"><i class="fas fa-file"></i>Tab 1<span class="close" onclick="closeTab(event, 'tab1')">&times;</span></div>
@@ -127,18 +159,30 @@
         <button onclick="document.getElementById('fileInput').click()">Load</button>
         <button onclick="clearEditor()">Clear</button>
       </div>
-      <div id="issueCount">Issues: 0</div>
     </div>
   </div>
+
   <div id="iframeContainer" style="display:none;">
     <iframe src="https://scriptblox.com"></iframe>
   </div>
+
+  <div id="settings-content" style="display:none;">
+    <label><input type="checkbox" id="auto-inject" /> Auto Inject</label>
+    <label><input type="checkbox" id="auto-execute" /> Auto Execute</label>
+    <div class="slider-container">
+      <div class="slider-label">Walk Speed</div>
+      <input type="range" id="walk-speed" class="slider" min="10" max="100" value="16" />
+      <div class="slider-label">Jump Speed</div>
+      <input type="range" id="jump-speed" class="slider" min="10" max="100" value="50" />
+    </div>
+  </div>
+
   <script>
     require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
     let editors = {};
     let tabCount = 1;
+    let tabNames = ['tab1'];
     let initialCode = 'print("Have fun using Skyfall")';
-    let diagnostics = [];
 
     require(['vs/editor/editor.main'], function () {
       monaco.languages.register({ id: 'lua' });
@@ -174,6 +218,7 @@
           'editor.selectionHighlightBackground': '#ffffff10'
         }
       });
+
       monaco.editor.setTheme('skyfall-cool');
       editors['tab1'] = monaco.editor.create(document.getElementById('tab1'), {
         value: initialCode,
@@ -191,31 +236,23 @@
       editors['tab1'].onDidChangeModelContent(function () {
         updateIssuesCount();
       });
-
-      function updateIssuesCount() {
-        const model = editors['tab1'].getModel();
-        diagnostics = monaco.editor.getModelMarkers({ model: model });
-        const issueCount = diagnostics.filter(d => d.severity === monaco.MarkerSeverity.Error).length;
-        document.getElementById('issueCount').innerText = `Issues: ${issueCount}`;
-      }
     });
 
     function addTab() {
-      tabCount++;
-      const tabId = `tab${tabCount}`;
-      const tabLabel = `Tab ${tabCount}`;
+      let newTabId = 'tab' + (getNextTabId());
+      const tabLabel = 'Tab ' + (tabCount + 1);
       const tab = document.createElement('div');
       tab.className = 'tab';
-      tab.dataset.id = tabId;
-      tab.innerHTML = `<i class="fas fa-file"></i>${tabLabel}<span class="close" onclick="closeTab(event, '${tabId}')">&times;</span>`;
-      tab.onclick = () => switchTab(tabId);
+      tab.dataset.id = newTabId;
+      tab.innerHTML = `<i class="fas fa-file"></i>${tabLabel}<span class="close" onclick="closeTab(event, '${newTabId}')">&times;</span>`;
+      tab.onclick = () => switchTab(newTabId);
       document.getElementById('tabs').insertBefore(tab, document.querySelector('#tabs button'));
       const editorDiv = document.createElement('div');
-      editorDiv.id = tabId;
+      editorDiv.id = newTabId;
       editorDiv.className = 'editor-instance';
       document.getElementById('editor-container').appendChild(editorDiv);
       require(['vs/editor/editor.main'], function () {
-        editors[tabId] = monaco.editor.create(editorDiv, {
+        editors[newTabId] = monaco.editor.create(editorDiv, {
           value: initialCode,
           language: 'lua',
           theme: 'skyfall-cool',
@@ -228,11 +265,22 @@
           cursorBlinking: 'phase'
         });
 
-        editors[tabId].onDidChangeModelContent(function () {
+        editors[newTabId].onDidChangeModelContent(function () {
           updateIssuesCount();
         });
       });
-      switchTab(tabId);
+      tabNames.push(newTabId);
+      switchTab(newTabId);
+    }
+
+    function getNextTabId() {
+      let availableTabs = Array.from({ length: tabCount }, (_, i) => 'tab' + (i + 1));
+      for (let i = 1; i <= tabCount; i++) {
+        if (!tabNames.includes('tab' + i)) {
+          return i;
+        }
+      }
+      return tabCount + 1;
     }
 
     function switchTab(tabId) {
@@ -250,6 +298,7 @@
       }
       document.getElementById(tabId).remove();
       document.querySelector(`.tab[data-id="${tabId}"]`).remove();
+      tabNames = tabNames.filter(id => id !== tabId);
       const nextTab = document.querySelector('.tab');
       if (nextTab) switchTab(nextTab.dataset.id);
     }
@@ -271,38 +320,14 @@
       editors[activeId].setValue('');
     }
 
-    document.getElementById('fileInput').addEventListener('change', function (event) {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function (e) {
-          const activeId = document.querySelector('.editor-instance.active').id;
-          editors[activeId].setValue(e.target.result);
-        };
-        reader.readAsText(file);
-      }
-    });
-
     function openScriptBlox() {
       document.getElementById('iframeContainer').style.display = 'block';
     }
 
-    window.addEventListener('beforeunload', function (e) {
-      e.preventDefault();
-      e.returnValue = '';
-    });
-
-    document.addEventListener('keydown', function (e) {
-      if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        saveToFile();
-      }
-      if (e.ctrlKey && e.key === 'w') {
-        e.preventDefault();
-        const activeId = document.querySelector('.tab.active').dataset.id;
-        closeTab(new Event('click'), activeId);
-      }
-    });
+    function toggleSettings() {
+      const settingsContent = document.getElementById('settings-content');
+      settingsContent.style.display = settingsContent.style.display === 'none' ? 'block' : 'none';
+    }
   </script>
 </body>
 </html>
